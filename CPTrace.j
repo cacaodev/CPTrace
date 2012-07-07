@@ -109,7 +109,7 @@ function CPTrace(aClassName, aSelector, displayFunction)
         [CPException raise:CPInvalidArgumentException reason:("Unknown class name '" + aClassName + "'")];
 }
 
-var _CPTraceClass = function _CPTraceClass(aClass, aSelector, displayFunction)
+var _CPTraceClass = function(aClass, aSelector, displayFunction)
 {    
     if (![aClass instancesRespondToSelector:aSelector])
         [CPException raise:CPInvalidArgumentException reason:(aClass + " does not respond to '" + aSelector + "'")];
@@ -168,17 +168,17 @@ var _CPTraceClass = function _CPTraceClass(aClass, aSelector, displayFunction)
     [patchedClassesAndSelectors addObject:patchUniqueString];
 };
 
-var CPTraceStop = function CPTraceStop(aClass, aSelector)
+function CPTraceStop(aClass, aSelector)
 {
-    if (![aClass instancesRespondToSelector:aSelector])
-        [CPException raise:CPInvalidArgumentException reason:(aClass + " does not respond to '" + aSelector + "'")];
-
-    var patched_sel = CPSelectorFromString("patched_" + CPStringFromSelector(aSelector)),
-        patchUniqueString = (aClass + "_" + aSelector);
-
-    Swizzle(aClass, patched_sel, aSelector);
-    [patchedClassesAndSelectors removeObject:patchUniqueString];
-};
+    var patchUniqueString = (aClass + "_" + aSelector);
+    
+    if ([patchedClassesAndSelectors containsObject:patchUniqueString])
+    {
+        var patched_sel = CPSelectorFromString("patched_" + CPStringFromSelector(aSelector));
+        Swizzle(CPClassFromString(aClass), patched_sel, aSelector);
+        [patchedClassesAndSelectors removeObject:patchUniqueString];
+    }
+}
 
 var Swizzle = function(aClass, orig_sel, new_sel)
 {

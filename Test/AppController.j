@@ -24,7 +24,9 @@
     CPTrace("TestSubclass1", "test:times:", displayFunction);
     CPTrace("TestSubclass2", "test:times:");
     CPTrace("TestSubclass3", "test:times:");
-    
+    CPTraceStop("TestSubclass3", "test:times:");
+    CPTrace("TestSubclass3", "test:times:");
+
     var sub3 = [TestSubclass3 new];
     [sub3 test:3 times:1000];
 
