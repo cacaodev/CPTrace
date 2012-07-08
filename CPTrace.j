@@ -66,7 +66,7 @@ var objj_message = function(receiver, selector, args)
         rdesc = receiver ? [receiver description] : "<null>";
 
     while (c--)
-        sel.splice(c + 1, 0, ":" + [args[c] description] + " ");
+        sel.splice(c + 1, 0, ":" + args[c] + " ");
 
     var joined = sel.join("");
 
@@ -92,7 +92,7 @@ function CPTrace(aClassName, aSelector, displayFunction)
         while (numclasses--)
         {
             var cls = classes[numclasses];
-            if (regex.test(cls))
+            if (regex.test(cls) && class_getInstanceMethod(cls, aSelector))
             {
                 console.log("Patching " + cls + " -" + aSelector);
                 _CPTraceClass(cls, aSelector, displayFunction);
@@ -115,7 +115,7 @@ var _CPTraceClass = function(aClass, aSelector, displayFunction)
         [CPException raise:CPInvalidArgumentException reason:(aClass + " does not respond to '" + aSelector + "'")];
 
     var superclass = aClass;
-    while (![superclass instancesImplementsSelector:aSelector] && superclass != [CPObject class])
+    while (!class_getInstanceMethod(superclass, aSelector) && superclass != [CPObject class])
         superclass = [superclass superclass];
 
     var patchUniqueString = (superclass + "_" + aSelector);
@@ -217,19 +217,3 @@ var getMethodNoSuper = function(cls, sel)
     
     return NULL;
 }
-
-@implementation CPObject (instancesImplementsSelector)
-
-- (BOOL)instancesImplementsSelector:(SEL)aSelector
-{
-    var methods = class_copyMethodList(self),
-        count = methods.length;
-
-    while (count--)
-        if (method_getName(methods[count]) === aSelector)
-            return YES;
-
-    return NO;
-}
-
-@end
