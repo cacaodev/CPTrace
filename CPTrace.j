@@ -17,7 +17,43 @@
  * You should have received a copy of the GNU Lesser General Public
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
- */
+
+// ========== 
+// ! USAGE:   
+// ========== 
+
+Trace an instance method for a given class.
+    
+    CPTrace(aClassName, aSelector, [optional] displayFunction);
+    If displayFunction is not specified, a default message containing relevant infos will be logged to the console.
+
+
+Stop tracing an instance method for a given class:
+    
+    CPTraceStop(aClassName, aSelector);
+
+    
+Arguments for the displayFunction:
+
+    function(aReceiver, aSelector, arguments_array, duration_in_ms, total_duration_in_ms, total_count, nesting_level)
+
+
+// ======== 
+// ! Notes   
+// ======== 
+
+    - nesting_level is the nesting level for selectors you chose to trace, NOT for all calls.
+    - total_duration and total_count are valid only if the nesting_level is 0 (root calls).
+    - If traced calls are nested, the output will appear in the right order (not reversed). You get nesting information with the nested_level argument of the displayFunction.
+    - If an argument is a js object (CGPoint for example), the default log won't give any useful info. You need to handle its description in a custom displayFunction.
+    
+// ========= 
+// ! TODO:   
+// ========= 
+
+    Class methods are not supported. 
+    total_duration and total_count are valid only if the nesting_level is 0 (root calls).
+*/
 
 var patchedClassesAndSelectors = [],
     globalStack = [],
@@ -47,7 +83,7 @@ var defaultDisplay  = function(receiver, selector, args, duration, total_duratio
         // WARNING: average duration only supported for root calls.
         avg_message = (level == 0) ? (" , avg = " + (ROUND(100 * total_duration / total_count) / 100) + " ms") : "";
 
-    console.log(indent(level) + message + " in " + duration + " ms" + avg_message);
+    CPLogConsole(indent(level) + message + " in " + duration + " ms" + avg_message);
 };
 
 var indent = function(n)
