@@ -7,7 +7,7 @@
  */
 
 @import <Foundation/CPObject.j>
-@import "../CPTrace.j"
+@import "../../CPTrace.j"
 
 @implementation AppController : CPObject
 {
@@ -19,12 +19,12 @@
     {
         document.write("This is a custom log. The receiver is " +  [receiver class] + " and the level is " + level + "<br/>");
     }
+
+    CPTrace("TestSubclass1", "+classMethod");
     
     CPTrace("Test", "test:times:", displayFunction);
     CPTrace("TestSubclass1", "test:times:", displayFunction);
     CPTrace("TestSubclass2", "test:times:");
-    CPTrace("TestSubclass3", "test:times:");
-    CPTraceStop("TestSubclass3", "test:times:");
     CPTrace("TestSubclass3", "test:times:");
 
     var sub3 = [TestSubclass3 new];
@@ -60,6 +60,11 @@
 
 @implementation Test : CPObject
 {
+}
+
++ (void)classMethod
+{
+
 }
 
 - (void)test:(id)angle times:(id)c
@@ -124,7 +129,7 @@ var c = 10000;
 {
 }
 
-- (void)test:(id)angle times:(id)c
+- (void)blurptest:(id)angle times:(id)c
 {
     while(c--)
         var cos = Math.cos(angle) + Math.sin(angle);

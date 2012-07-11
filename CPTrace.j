@@ -18,40 +18,40 @@
  * License along with this library; if not, write to the Free Software
  * Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 
-// ========== 
-// ! USAGE:   
-// ========== 
+// ==========
+// ! USAGE:
+// ==========
 
 Trace an instance method for a given class.
-    
+
     CPTrace(aClassName, aSelector, [optional] displayFunction);
     If displayFunction is not specified, a default message containing relevant infos will be logged to the console.
 
 
 Stop tracing an instance method for a given class:
-    
+
     CPTraceStop(aClassName, aSelector);
 
-    
+
 Arguments for the displayFunction:
 
     function(aReceiver, aSelector, arguments_array, duration_in_ms, total_duration_in_ms, total_count, nesting_level)
 
 
-// ======== 
-// ! Notes   
-// ======== 
+// ========
+// ! Notes
+// ========
 
     - nesting_level is the nesting level for selectors you chose to trace, NOT for all calls.
     - total_duration and total_count are valid only if the nesting_level is 0 (root calls).
     - If traced calls are nested, the output will appear in the right order (not reversed). You get nesting information with the nested_level argument of the displayFunction.
     - If an argument is a js object (CGPoint for example), the default log won't give any useful info. You need to handle its description in a custom displayFunction.
-    
-// ========= 
-// ! TODO:   
-// ========= 
 
-    Class methods are not supported. 
+// =========
+// ! TODO:
+// =========
+
+    Class methods are not supported.
     total_duration and total_count are valid only if the nesting_level is 0 (root calls).
 */
 
@@ -117,25 +117,25 @@ function CPTrace(aClassName, aSelector, displayFunction)
     var aclass = CPClassFromString(aClassName);
 
     if (aclass)
-       _CPTraceClass(aclass, aSelector, displayFunction);
+       _CPTraceClass(aclass, aSelector, displayFunction, YES);
     else if (typeof(objj_getClassList) != 'undefined')
     {
-        var classes = [],
+        var regex = new RegExp(aClassName),
+            classes = [],
             patchednum = 0,
-            numclasses = objj_getClassList(classes, 400),
-            regex = new RegExp(aClassName);
+            numclasses = objj_getClassList(classes, 400);
 
         while (numclasses--)
         {
             var cls = classes[numclasses];
             if (regex.test(cls) && class_getInstanceMethod(cls, aSelector))
             {
-                console.log("Patching " + cls + " -" + aSelector);
-                _CPTraceClass(cls, aSelector, displayFunction);
-                patchednum++;
-            }    
+                console.log("Patching " + cls + " " + aSelector);
+                if (_CPTraceClass(cls, aSelector, displayFunction, NO))
+                    patchednum++;
+            }
         }
-        
+
         if (patchednum == 0)
             console.log("Could not find any class matching '" + aClassName + "'");
         else
@@ -145,32 +145,52 @@ function CPTrace(aClassName, aSelector, displayFunction)
         [CPException raise:CPInvalidArgumentException reason:("Unknown class name '" + aClassName + "'")];
 }
 
-var _CPTraceClass = function(aClass, aSelector, displayFunction)
-{    
-    if (![aClass instancesRespondToSelector:aSelector])
-        [CPException raise:CPInvalidArgumentException reason:(aClass + " does not respond to '" + aSelector + "'")];
+var _CPTraceClass = function(aClass, aSelector, displayFunction, raiseIfNotResponding)
+{
+    var cls,
+        sel,
+        superclass,
+        isMetaClass = [aSelector hasPrefix:@"+"];
 
-    var superclass = aClass;
-    while (!class_getInstanceMethod(superclass, aSelector) && superclass != [CPObject class])
-        superclass = [superclass superclass];
-
-    var patchUniqueString = (superclass + "_" + aSelector);
-    if ([patchedClassesAndSelectors containsObject:patchUniqueString])
+    if (isMetaClass)
     {
-        if (superclass == aClass)
-            console.log(superclass + " -" + aSelector + " is already patched. Ignoring.");
-        else
-            console.log("-" + aSelector + " is implemented in a superclass of " + aClass + " (" + superclass + ") where it's already patched. Ignoring.");
-
-        return;
+        sel = aSelector.substring(1);
+        cls = objj_getMetaClass(class_getName(aClass));
+    }
+    else
+    {
+        cls = aClass;
+        sel = aSelector;
     }
 
-    var patched_sel = CPSelectorFromString("patched_" + CPStringFromSelector(aSelector)),
+    superclass = cls;
+
+    if (isAlreadyPatched(superclass, aSelector))
+        return NO;
+
+    while (superclass && !getMethodNoSuper(superclass, sel))
+    {
+        superclass = class_getSuperclass(superclass);
+        if (isMetaClass)
+            superclass = objj_getMetaClass(class_getName(superclass));
+    }
+
+    if (!superclass || !getMethodNoSuper(superclass, sel))
+    {
+        if (raiseIfNotResponding)
+            [CPException raise:CPInvalidArgumentException reason:(aClass + " does not respond to '" + aSelector + "'")];
+        return NO;
+    }
+
+    if (superclass != cls && isAlreadyPatched(superclass, aSelector))
+        return NO;
+        
+    var patched_sel = CPSelectorFromString("patched_" + aSelector),
         tracer = new Tracer();
 
     tracer.displayFunction = displayFunction ? displayFunction : defaultDisplay;
-    
-    class_addMethod(aClass, patched_sel, function()
+
+    class_addMethod(cls, patched_sel, function()
     {
         var orig_arguments = arguments,
             receiver = orig_arguments[0],
@@ -192,28 +212,44 @@ var _CPTraceClass = function(aClass, aSelector, displayFunction)
         globalLevel--;
         if (globalLevel == 0)
         {
-            if (duration > 0)
-                tracer.tc++;
+            tracer.tc++;
             tracer.td += trace.duration;
             tracer.log();
         }
 
     }, "");
 
-    Swizzle(aClass, aSelector, patched_sel);
-    [patchedClassesAndSelectors addObject:patchUniqueString];
+    Swizzle(cls, sel, patched_sel);
+
+    return YES;
 };
 
-function CPTraceStop(aClass, aSelector)
+function CPTraceStop(aClassName, aSelector)
 {
-    var patchUniqueString = (aClass + "_" + aSelector);
-    
-    if ([patchedClassesAndSelectors containsObject:patchUniqueString])
+    var cls,
+        sel,
+        isMetaClass = [aSelector hasPrefix:@"+"];
+
+    if (isMetaClass)
     {
-        var patched_sel = CPSelectorFromString("patched_" + CPStringFromSelector(aSelector));
-        Swizzle(CPClassFromString(aClass), patched_sel, aSelector);
-        [patchedClassesAndSelectors removeObject:patchUniqueString];
+        sel = aSelector.substring(1);
+        cls = objj_getMetaClass(aClassName);
     }
+    else
+    {
+        cls = objj_getClass(aClassName);
+        sel = aSelector;
+    }
+
+    var patched_sel = CPSelectorFromString("patched_" + aSelector);
+    var patchUniqueString = (class_getName(cls) + "_" + aSelector);
+    if (getMethodNoSuper(cls, patched_sel) !== NULL)
+    {
+        Swizzle(cls, patched_sel, sel);
+        [patchedClassesAndSelectors removeObject:patchUniqueString]; // WONT WORK IF sel IMPLEMENTED IN A SUPERCLASS
+    }
+    else
+        console.log("Nothing to untrace");
 }
 
 var Swizzle = function(aClass, orig_sel, new_sel)
@@ -250,6 +286,21 @@ var getMethodNoSuper = function(cls, sel)
         if (mthd.name == sel)
             return mthd;
     }
-    
+
     return NULL;
+};
+
+var isAlreadyPatched = function(aClass, aSelector)
+{
+    var patchUniqueString = (class_getName(aClass) + "_" + aSelector);
+
+    if ([patchedClassesAndSelectors containsObject:patchUniqueString])
+    {
+        CPLogConsole(aClass + " " + aSelector + " is already patched. Ignoring.");
+        return YES;
+    }
+    
+    [patchedClassesAndSelectors addObject:patchUniqueString];
+    
+    return NO;
 }
