@@ -7,14 +7,14 @@
  */
 
 @import <Foundation/CPObject.j>
-@import "../../CPTrace.j"
+@import "CPTrace.j"
 
 @implementation AppController : CPObject
 {
     @outlet CPWindow    theWindow; //this "outlet" is connected automatically by the Cib
     @outlet CPComboBox classesCombo;
     @outlet CPComboBox methodsCombo;
-    
+
     CPArray classList @accessors;
     CPArray methodsList @accessors;
 }
@@ -32,7 +32,7 @@
 
     // In this case, we want the window from Cib to become our full browser window
     methodsList = [];
-    
+
     [classesCombo setForceSelection:YES];
     [classesCombo setTarget:self];
     [classesCombo setAction:@selector(didChooseClass:)];
@@ -41,9 +41,9 @@
 
     var center = [CPNotificationCenter defaultCenter];
     [center addObserver:self selector:@selector(willDismiss:) name:CPComboBoxWillDismissNotification object:classesCombo];
-    
+
     [theWindow setFullPlatformWindow:YES];
-    
+
     var classes = [];
     var n = objj_getClassList(classes, 400);
     classes.sort(function(a,b){return (a.name > b.name) ? 1 : -1;});
@@ -59,12 +59,12 @@
 {
     var clsname = [sender objectValue],
         cls = CPClassFromString(clsname);
-    
+
     if (cls)
     {
         var imethlist = class_copyMethodList(cls),
             cmethlist = class_copyMethodList(objj_getMetaClass(clsname));
-              
+
         imethlist = imethlist.sort(MethodsSortCompare);
         imethlist = imethlist.map(function(m){return {method:m, classMethod:NO};});
         cmethlist = cmethlist.sort(MethodsSortCompare);
@@ -90,7 +90,7 @@
 
         if (methodRecord.classMethod)
             name = "+" + name;
-            
+
         return name;
     }
 }
@@ -100,12 +100,12 @@
     if (aComboBox === classesCombo)
     {
         var index = [classList indexOfObjectPassingTest:ClassesCompletionTest context:uncomplete];
-        return (index !== CPNotFound) ? class_getName(classList[index]) : nil; 
+        return (index !== CPNotFound) ? class_getName(classList[index]) : nil;
     }
     else
     {
         var index = [methodsList indexOfObjectPassingTest:MethodsCompletionTest context:uncomplete];
-        return (index !== CPNotFound) ?  method_getName(methodsList[index].method) : nil; 
+        return (index !== CPNotFound) ?  method_getName(methodsList[index].method) : nil;
     }
 }
 
@@ -122,7 +122,7 @@
     var selectedClass = [classesCombo objectValue],
         selectedSelector = [methodsCombo objectValue],
         enabled;
-        
+
     if (selectedClass == nil || selectedSelector == nil)
         return;
 
@@ -136,7 +136,7 @@
         CPTraceStop(selectedClass, selectedSelector);
         enabled = YES;
     }
-    
+
     [classesCombo setEnabled:enabled];
     [methodsCombo setEnabled:enabled];
 }
